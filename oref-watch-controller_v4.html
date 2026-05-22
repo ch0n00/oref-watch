@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Oref Watch Controller</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Heebo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Variables ───────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+
+:root{
+  --bg:        #070709;
+  --surface:   #0f0f12;
+  --card:      #161619;
+  --card2:     #1c1c20;
+  --border:    #252528;
+  --border2:   #32323a;
+  --yellow:    #FFB800;
+  --red:       #E82020;
+  --green:     #18C85A;
+  --grey:      #58585e;
+  --blue:      #3a7bff;
+  --blue2:     #5090ff;
+  --text:      #eeeef0;
+  --text2:     #aaaaae;
+  --muted:     #606068;
+  --mono:      'IBM Plex Mono',monospace;
+  --sans:      'Heebo',sans-serif;
+  --radius:    12px;
+}
+
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  display:flex;
+  flex-direction:column;
+  max-width:480px;
+  margin:0 auto;
+  position:relative;
+}
+
+/* Scanline texture */
+body::after{
+  content:'';
+  position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px);
+  pointer-events:none;z-index:9000;
+}
+
+/* ── HEADER ──────────────────────────────────────────────────────────────── */
+.hdr{
+  padding:11px 14px 10px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  justify-content:space-between;
+  flex-shrink:0;
+  gap:10px;
+}
+.hdr-title .t1{
+  font-family:var(--mono);
+  font-size:16px;font-weight:700;
+  letter-spacing:3px;color:var(--text);
+  line-height:1;
+}
+.hdr-title .t2{
+  font-size:9px;letter-spacing:4px;
+  color:var(--muted);margin-top:2px;
+}
+
+/* Mode toggle pill */
+.mode-pill{
+  display:flex;align-items:center;
+  background:var(--card);
+  border:1px solid var(--border2);
+  border-radius:20px;
+  padding:2px;
+  gap:0;
+  flex-shrink:0;
+}
+.mpb{
+  padding:5px 11px;
+  font-size:11.5px;font-weight:600;
+  font-family:var(--sans);
+  background:transparent;
+  color:var(--muted);
+  border:none;cursor:pointer;
+  border-radius:18px;
+  transition:all .22s;
+  white-space:nowrap;
+}
+.mpb.active{
+  background:var(--card2);
+  color:var(--text);
+  box-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+.mpb.active.real{color:var(--red)}
+
+/* ── BLE PANEL  (persistent) ─────────────────────────────────────────────── */
+.ble-panel{
+  padding:8px 12px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  display:flex;flex-direction:column;
+  gap:6px;flex-shrink:0;
+}
+.ble-row{display:flex;align-items:center;gap:7px}
+
+/* Device dropdown */
+.sel-wrap{flex:1;position:relative}
+#deviceSelect{
+  width:100%;
+  background:var(--card);
+  color:var(--text);
+  border:1px solid var(--border2);
+  border-radius:9px;
+  padding:9px 10px 9px 30px;
+  font-size:13px;font-family:var(--sans);
+  cursor:pointer;
+  appearance:none;-webkit-appearance:none;
+  outline:none;
+  transition:border-color .2s;
+}
+#deviceSelect:focus{border-color:var(--blue)}
+.sel-arr{
+  position:absolute;left:9px;top:50%;
+  transform:translateY(-50%);
+  color:var(--muted);pointer-events:none;
+  font-size:9px;
+}
+
+/* Scan button */
+#btnScan{
+  background:var(--blue);color:#fff;
+  border:none;border-radius:9px;
+  padding:9px 16px;
+  font-size:13px;font-family:var(--sans);font-weight:700;
+  cursor:pointer;white-space:nowrap;
+  transition:all .2s;flex-shrink:0;
+}
+#btnScan:active{filter:brightness(.85)}
+#btnScan:disabled{opacity:.5;cursor:default}
+
+/* Connection status label — full width card below buttons */
+#lblScan{
+  flex:1;font-size:13px;
+  color:var(--muted);
+  padding:0 6px;
+  transition:color .3s;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+#lblScan.scanning{color:var(--yellow)}
+#lblScan.found{color:var(--green)}
+#lblScan.connected{color:var(--green);font-weight:700}
+#lblScan.error{color:var(--red)}
+
+/* Dedicated full-width connection status bar */
+#connStatus{
+  display:flex;align-items:center;gap:10px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;
+  margin-top:4px;transition:all .3s;
+}
+#connStatus .cs-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--grey);flex-shrink:0;
+  transition:background .4s;
+}
+#connStatus .cs-dot.on  {background:var(--green);box-shadow:0 0 6px var(--green)}
+#connStatus .cs-dot.scan{background:var(--yellow);animation:blink .8s infinite}
+#connStatus .cs-dot.err {background:var(--red)}
+#connStatus .cs-text{
+  flex:1;font-size:13px;font-weight:600;
+  color:var(--text);
+}
+#connStatus .cs-sub{
+  font-size:11px;color:var(--muted);font-weight:400;
+}
+
+/* Connect button removed — connection happens on dropdown select */
+
+/* Status info button */
+#btnInfo{
+  width:36px;height:36px;flex-shrink:0;
+  border-radius:9px;
+  background:var(--card);
+  border:1px solid var(--border2);
+  color:var(--muted);
+  cursor:pointer;display:flex;
+  align-items:center;justify-content:center;
+  font-size:16px;transition:all .2s;
+}
+#btnInfo:hover{border-color:var(--blue);color:var(--blue)}
+
+
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+
+/* ── SCREENS ─────────────────────────────────────────────────────────────── */
+.screen{
+  display:none;flex:1;
+  overflow-y:auto;overflow-x:hidden;
+  padding:13px 12px 18px;
+  -webkit-overflow-scrolling:touch;
+  flex-direction:column;
+}
+.screen.active{display:flex}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DEMO / CONTROL SCREEN
+══════════════════════════════════════════════════════════════════════════ */
+.btn-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:11px;flex:1;
+}
+
+.cmd{
+  border-radius:var(--radius);
+  border:1.5px solid;
+  background:transparent;
+  cursor:pointer;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  gap:5px;
+  font-family:var(--sans);
+  padding:14px 8px;
+  transition:transform .1s,filter .1s;
+  position:relative;overflow:hidden;
+  min-height:112px;
+  user-select:none;
+}
+/* Glow fill layer */
+.cmd::before{
+  content:'';position:absolute;inset:0;
+  opacity:0;transition:opacity .15s;
+}
+.cmd:active:not(.dim){transform:scale(.95)}
+.cmd.dim{opacity:.45;cursor:not-allowed;pointer-events:none}
+
+.cmd .n{
+  font-size:42px;font-weight:900;
+  font-family:var(--mono);line-height:1;
+  position:relative;z-index:1;
+  text-shadow:0 0 22px currentColor, 0 0 6px currentColor;
+}
+.cmd .l{
+  font-size:12px;font-weight:700;
+  text-align:center;line-height:1.35;
+  letter-spacing:1.5px;text-transform:uppercase;
+  position:relative;z-index:1;
+  opacity:1;
+}
+
+/* Colour variants — bright borders, bright text, visible background tint */
+.cy{border:2px solid #FFD234;color:#FFE566;background:rgba(255,210,52,.16)}
+.cy::before{background:#FFD234}
+.cy:hover::before{opacity:.12}
+.cy.lit::before{opacity:.25}
+.cy.lit{border-color:#FFEA00;border-width:3px;color:#FFEE88}
+
+.cr{border:2px solid #FF5555;color:#FF7777;background:rgba(255,85,85,.16)}
+.cr::before{background:#FF5555}
+.cr:hover::before{opacity:.12}
+.cr.lit::before{opacity:.25}
+.cr.lit{border-color:#FF3333;border-width:3px;color:#FF9999}
+
+.cg{border:2px solid #22E86A;color:#44EE80;background:rgba(34,232,106,.15)}
+.cg::before{background:#22E86A}
+.cg:hover::before{opacity:.12}
+.cg.lit::before{opacity:.25}
+.cg.lit{border-color:#00FF55;border-width:3px;color:#88FFAA}
+
+.cx{border:2px solid #909098;color:#C8C8D0;background:rgba(160,160,175,.13)}
+.cx::before{background:#C0C0C8}
+.cx:hover::before{opacity:.10}
+.cx.lit::before{opacity:.18}
+.cx.lit{border-color:#D0D0D8;border-width:3px;color:#E0E0E8}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REAL MODE SCREEN
+══════════════════════════════════════════════════════════════════════════ */
+
+/* Alert type bar */
+.at-bar{
+  background:var(--card);
+  border:1px solid var(--border2);
+  border-radius:var(--radius);
+  padding:11px 14px;
+  display:flex;align-items:center;
+  justify-content:space-between;
+  margin-bottom:11px;flex-shrink:0;
+}
+.at-left .at-label{
+  font-size:9.5px;letter-spacing:1.5px;
+  color:var(--muted);margin-bottom:3px;
+  text-transform:uppercase;
+}
+#lblAllertType{
+  font-size:15px;font-weight:700;
+  color:var(--text);
+}
+.poll-pill{
+  display:flex;align-items:center;gap:6px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:5px 11px;
+  font-size:11px;color:var(--muted);
+}
+.pdot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--grey);transition:background .4s;
+}
+.pdot.live{background:var(--green);animation:blink 2s infinite}
+.pdot.err{background:var(--red)}
+
+/* Active alert card */
+#alertCard{
+  display:none;
+  border-radius:var(--radius);
+  border:2px solid var(--red);
+  background:rgba(232,32,32,.07);
+  padding:14px;
+  margin-bottom:11px;
+  animation:pop .35s cubic-bezier(.34,1.56,.64,1);
+  flex-shrink:0;
+}
+#alertCard.show{display:block}
+@keyframes pop{
+  from{opacity:0;transform:scale(.96) translateY(-8px)}
+  to{opacity:1;transform:scale(1) translateY(0)}
+}
+.ac-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--red);color:#fff;
+  font-size:10px;font-weight:800;letter-spacing:1.5px;
+  padding:3px 10px;border-radius:20px;margin-bottom:8px;
+}
+.ac-badge-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:#fff;animation:blink .6s infinite;
+}
+.ac-cat{
+  display:inline-flex;align-items:center;gap:8px;
+  margin-bottom:8px;
+}
+.ac-cat-code{
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,80,40,0.5);
+  border-radius:6px;
+  padding:3px 10px;
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--red);
+}
+.ac-cat-name{
+  font-size:12px;color:rgba(255,120,80,0.85);font-weight:600;
+}
+.ac-title{
+  font-size:19px;font-weight:900;
+  color:var(--red);margin-bottom:7px;line-height:1.2;
+}
+.ac-areas{
+  font-size:13px;color:var(--text2);
+  line-height:1.7;margin-bottom:6px;
+}
+.ac-meta{
+  font-size:10.5px;color:var(--muted);font-family:var(--mono);
+}
+
+/* No-alert state */
+#noAlert{
+  text-align:center;padding:26px 0;
+  color:var(--muted);flex-shrink:0;
+}
+#noAlert .ni{font-size:42px;margin-bottom:8px}
+#noAlert .nt{font-size:14px}
+
+/* Section label */
+.sec-lbl{
+  font-size:9.5px;letter-spacing:1.5px;
+  color:var(--muted);margin-bottom:8px;
+  text-transform:uppercase;
+}
+
+/* History list */
+#histList{display:flex;flex-direction:column;gap:5px}
+.hi{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:9px;
+  padding:8px 11px;
+  display:flex;align-items:center;gap:9px;
+  animation:fadeIn .3s ease;
+}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+.hi-time{font-family:var(--mono);font-size:10px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.hi-type{font-size:12px;font-weight:700;color:var(--red);white-space:nowrap;flex-shrink:0}
+.hi-areas{font-size:11.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hi-empty{text-align:center;font-size:12px;color:var(--muted);padding:14px}
+
+/* CORS warning */
+#corsWarn{
+  background:rgba(232,32,32,.08);
+  border:1px solid rgba(232,32,32,.25);
+  border-radius:9px;padding:9px 12px;
+  font-size:12.5px;color:var(--red);
+  margin-bottom:10px;display:none;line-height:1.6;
+}
+#corsWarn small{font-size:10.5px;color:rgba(232,32,32,.75);display:block;margin-top:2px}
+#corsWarn b{font-weight:700}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   STATUS MODAL (bottom sheet)
+══════════════════════════════════════════════════════════════════════════ */
+#overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.78);z-index:800;
+  align-items:flex-end;justify-content:center;
+}
+#overlay.open{display:flex}
+.sheet{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-bottom:none;
+  border-radius:20px 20px 0 0;
+  padding:14px 18px 24px;
+  width:100%;max-width:480px;
+  animation:sheetUp .26s cubic-bezier(.34,.02,.64,1);
+}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+.sh-handle{
+  width:36px;height:4px;
+  background:var(--border2);
+  border-radius:2px;margin:0 auto 14px;
+}
+.sh-title{font-size:16px;font-weight:800;margin-bottom:13px;letter-spacing:.4px}
+.ir{
+  display:flex;justify-content:space-between;align-items:flex-start;
+  padding:8px 0;border-bottom:1px solid var(--border);gap:10px;
+}
+.ir:last-of-type{border-bottom:none}
+.ik{font-size:12px;color:var(--muted);flex-shrink:0}
+.iv{font-size:11px;font-family:var(--mono);color:var(--text);text-align:left;word-break:break-all}
+.iv.ok{color:var(--green)}
+.iv.bad{color:var(--red)}
+.sh-close{
+  width:100%;margin-top:14px;padding:11px;
+  background:var(--card);border:1px solid var(--border2);
+  border-radius:10px;color:var(--text2);
+  font-size:14px;font-family:var(--sans);cursor:pointer;
+  transition:background .2s;
+}
+.sh-close:hover{background:var(--card2)}
+
+/* ── TOAST ───────────────────────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:20px;left:50%;
+  transform:translateX(-50%) translateY(14px);
+  background:var(--card2);border:1px solid var(--border2);
+  border-radius:10px;padding:9px 16px;
+  font-size:13px;color:var(--text);
+  white-space:nowrap;opacity:0;pointer-events:none;
+  transition:opacity .22s,transform .22s;
+  z-index:9100;max-width:calc(100vw - 36px);
+  text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
+.screen::-webkit-scrollbar{width:3px}
+.screen::-webkit-scrollbar-track{background:transparent}
+.screen::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- ══ HEADER ════════════════════════════════════════════════════════════════ -->
+<header class="hdr">
+  <div class="hdr-title">
+    <div class="t1">OREF·WATCH</div>
+    <div class="t2">CONTROLLER</div>
+  </div>
+  <div class="mode-pill">
+    <button class="mpb active" id="btnDemo" onclick="setMode('demo')">Demo</button>
+    <button class="mpb real"   id="btnReal" onclick="setMode('real')">מצב אמת 🔴</button>
+  </div>
+</header>
+
+<!-- ══ BLE PANEL — persistent on both modes ══════════════════════════════════ -->
+<div class="ble-panel">
+  <!-- Row 1: Scan button + status label + info -->
+  <div class="ble-row">
+    <button id="btnScan" onclick="handleScan()">סרוק</button>
+    <span id="lblScan">לחץ סרוק לחיפוש מכשירים</span>
+    <button id="btnInfo" onclick="openInfo()" title="מידע חיבור">ℹ</button>
+  </div>
+  <!-- Row 2: dropdown only — selecting a device connects automatically -->
+  <div class="ble-row" id="rowConnect" style="display:none">
+    <div class="sel-wrap" style="flex:1">
+      <select id="deviceSelect" title="בחר מכשיר BLE" onchange="handleConnect()">
+        <option value="__none__">-- בחר מכשיר --</option>
+      </select>
+      <span class="sel-arr">▼</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONNECTION STATUS (replaces lblConnection from MIT) ══════════════════ -->
+<div id="connStatus">
+  <div class="cs-dot" id="csDot"></div>
+  <div>
+    <div class="cs-text" id="csText">לא מחובר</div>
+    <div class="cs-sub"  id="csSub">סרוק מכשיר כדי להתחיל</div>
+  </div>
+</div>
+
+
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SCREEN A — DEMO / CONTROL
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="screen active" id="scrDemo">
+  <div class="btn-grid">
+
+    <button class="cmd cy dim" id="btn1" onclick="sendBLE(1)">
+      <span class="n">1</span>
+      <span class="l">התרעה<br>מקדימה</span>
+    </button>
+
+    <button class="cmd cr dim" id="btn2" onclick="sendBLE(2)">
+      <span class="n">2</span>
+      <span class="l">התרעה<br>חמה</span>
+    </button>
+
+    <button class="cmd cg dim" id="btn3" onclick="sendBLE(3)">
+      <span class="n">3</span>
+      <span class="l">סיום<br>אירוע</span>
+    </button>
+
+    <button class="cmd cx dim" id="btn0" onclick="sendBLE(0)">
+      <span class="n">0</span>
+      <span class="l">כיבוי</span>
+    </button>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     SCREEN B — REAL MODE (Pikud HaOref live alerts)
+══════════════════════════════════════════════════════════════════════════ -->
+<div class="screen" id="scrReal">
+
+  <!-- Alert type label row -->
+  <div class="at-bar">
+    <div class="at-left">
+      <div class="at-label">סוג התרעה</div>
+      <div id="lblAllertType">ממתין&hellip;</div>
+    </div>
+    <div class="poll-pill">
+      <div class="pdot" id="pDot"></div>
+      <span id="pTxt">כבוי</span>
+    </div>
+  </div>
+
+  <!-- CORS / network error notice (content set dynamically by JS) -->
+  <div id="corsWarn"></div>
+
+  <!-- Active alert card (hidden when silent) -->
+  <div id="alertCard">
+    <div class="ac-badge"><div class="ac-badge-dot"></div><span id="acBadgeTxt">התרעה פעילה</span></div>
+    <div class="ac-cat">
+      <span class="ac-cat-code" id="acCatCode">—</span>
+      <span class="ac-cat-name" id="acCatName"></span>
+    </div>
+    <div class="ac-title"  id="acTitle">—</div>
+    <div class="ac-areas"  id="acAreas"></div>
+    <div class="ac-meta"   id="acMeta"></div>
+  </div>
+
+  <!-- No-alert placeholder -->
+  <div id="noAlert">
+    <div class="ni">🛡️</div>
+    <div class="nt">אין התרעות פעילות</div>
+  </div>
+
+  <!-- History -->
+  <div class="sec-lbl">היסטוריית התרעות</div>
+  <div id="histList">
+    <div class="hi-empty">אין היסטוריה עדיין</div>
+  </div>
+
+</div>
+
+<!-- ══ STATUS INFO SHEET ══════════════════════════════════════════════════════ -->
+<div id="overlay" onclick="closeInfoOutside(event)">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-title">מידע חיבור</div>
+
+    <div class="ir"><span class="ik">מצב</span>         <span class="iv" id="iStat">מנותק</span></div>
+    <div class="ir"><span class="ik">מכשיר</span>       <span class="iv" id="iName">—</span></div>
+    <div class="ir"><span class="ik">כתובת / ID</span>  <span class="iv" id="iAddr">—</span></div>
+    <div class="ir"><span class="ik">Service UUID</span> <span class="iv">7b7f0001-…-abcdef123456</span></div>
+    <div class="ir"><span class="ik">Char UUID</span>    <span class="iv">7b7f0002-…-abcdef123456</span></div>
+    <div class="ir"><span class="ik">AppInventor</span>  <span class="iv" id="iApp">—</span></div>
+    <div class="ir"><span class="ik">Oref endpoint</span><span class="iv" id="iEp">—</span></div>
+    <div class="ir"><span class="ik">מצב אמת</span>     <span class="iv" id="iReal">כבוי</span></div>
+    <div class="ir"><span class="ik">גרסה</span>         <span class="iv">1.1.0</span></div>
+
+    <button class="sh-close" onclick="closeInfo()">סגור</button>
+  </div>
+</div>
+
+<!-- ══ TOAST ══════════════════════════════════════════════════════════════════ -->
+<div id="toast"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════════════════════════ -->
+<script>
+/* ─── Constants ───────────────────────────────────────────────────────────── */
+// WHY THREE URLs?
+// api.oref.org.il does NOT return Access-Control-Allow-Origin:* — browsers
+// (and Android WebView inside MIT App Inventor) block the response via CORS.
+// This is a client-side security rule, not a network failure.
+// Solution: route through a CORS proxy that adds the missing header.
+//
+//  1. Direct          → works only if server sends CORS header (usually fails
+//                        from file:// or App Inventor WebView)
+//  2. corsproxy.io    → free public proxy; forwards response + injects CORS header
+//  3. allorigins.win  → second free proxy; wraps body in JSON { contents: "..." }
+//
+// The code tries them in order and locks onto the first that succeeds.
+
+const OREF_BASE = 'https://api.oref.org.il/api/v1/alerts';
+
+const OREF_ENDPOINTS = [
+  // No custom headers on any of these — avoid preflight (OPTIONS) which causes hangs
+  { url: 'https://corsproxy.io/?' + OREF_BASE,                           label: 'corsproxy',   wrap: false },
+  { url: 'https://api.allorigins.win/raw?url=' + encodeURIComponent(OREF_BASE), label: 'allorigins-raw', wrap: false },
+  { url: 'https://api.allorigins.win/get?url=' + encodeURIComponent(OREF_BASE), label: 'allorigins',     wrap: true  },
+  { url: 'https://thingproxy.freeboard.io/fetch/' + OREF_BASE,           label: 'thingproxy',  wrap: false },
+];
+
+const POLL_MS    = 5000;   // real-mode polling interval (ms)
+const APP_INV_MS = 350;    // AppInventor message poll interval (ms)
+
+const CMD = {0:'כיבוי', 1:'התרעה מקדימה', 2:'התרעה חמה', 3:'סיום אירוע'};
+
+/* ─── App State ───────────────────────────────────────────────────────────── */
+let curMode      = 'demo';   // 'demo' | 'real'
+let bleConn      = false;
+let devName      = '';
+let devAddr      = '';
+let alertActive  = false;
+let lastAlertId  = null;
+let alertHistory = [];
+let pollTimer    = null;
+let appTimer     = null;
+let lastAppMsg   = '';
+let scanning     = false;
+let devices      = [];       // [{name, addr}] discovered via App Inventor
+let orefEpIdx    = 0;        // which endpoint index is currently working
+let appOrefReceived = false; // true once App Inventor has delivered Oref data → skip fetch
+
+/* ─── MIT App Inventor Bridge ─────────────────────────────────────────────── */
+// Sends a string to the MIT App Inventor app.
+// The app listens via WebViewer.WebViewStringChange → processes the string → acts on BLE.
+function toApp(val) {
+  try {
+    if (window.AppInventor) {
+      window.AppInventor.setWebViewString(String(val));
+      return true;
+    }
+  } catch(e) { console.warn('[AI bridge] setWebViewString error:', e); }
+  return false;
+}
+
+// Reads a string the MIT app has placed for the page.
+function fromApp() {
+  try {
+    if (window.AppInventor) return window.AppInventor.getWebViewString() || '';
+  } catch(e) {}
+  return '';
+}
+
+// Called by App Inventor via WebViewer.RunJavaScript("appMsg('...')") if desired.
+// Also polled below.
+function appMsg(raw) {
+  if (!raw || raw === lastAppMsg) return;
+  lastAppMsg = raw;
+
+  // Protocol:
+  //   CONNECTED:DeviceName:AA:BB:CC:DD:EE:FF
+  //   DISCONNECTED
+  //   SCANNING
+  //   SCAN_END
+  //   DEVICE:name:address            (one device found)
+  //   DEVICES:name1|addr1,name2|addr2  (batch)
+  //   STATUS:any message text
+  //   ERROR:message
+
+  if (raw.startsWith('CONNECTED:')) {
+    const parts = raw.split(':');
+    devName = parts[1] || 'מכשיר';
+    devAddr = parts.slice(2).join(':') || '—';
+    onConnected();
+
+  } else if (raw === 'DISCONNECTED') {
+    onDisconnected();
+
+  } else if (raw === 'SCANNING') {
+    scanning = true;
+    setStatus('סורק…', 'scan');
+    setScanLabel('סורק…', 'scanning');
+    document.getElementById('btnScan').disabled = true;
+
+  } else if (raw === 'SCAN_END') {
+    scanning = false;
+    resetScanBtn();
+    if (!bleConn && devices.length === 0) {
+      setScanLabel('לא נמצאו מכשירים — נסה שוב', 'error');
+      setStatus('לא נמצאו מכשירים', '');
+    }
+    populateDropdown();
+
+  } else if (raw.startsWith('DEVICE:')) {
+    // "DEVICE:DeviceName"  — one device found during scan
+    addDevice(raw.substring(7));
+
+  } else if (raw.startsWith('DEVICES:')) {
+    // "DEVICES:name1,name2,name3"  — full list after scan (comma-separated names)
+    raw.substring(8).split(',').forEach(n => addDevice(n));
+    populateDropdown();
+
+  } else if (raw.startsWith('STATUS:')) {
+    setStatus(raw.substring(7), bleConn ? 'on' : '');
+
+  } else if (raw.startsWith('ERROR:')) {
+    setStatus('⚠ ' + raw.substring(6), 'err');
+    toast('❌ ' + raw.substring(6));
+
+  // ── Oref alert data forwarded by App Inventor's Web component ──
+  // App Inventor block: Web1.GotText → WebViewer.WebViewString = "OREF_DATA:" + responseContent
+  } else if (raw.startsWith('OREF_DATA:')) {
+    appOrefReceived = true;   // lock onto App Inventor path; skip direct fetch
+    processOrefRaw(raw.substring(10));
+  }
+}
+
+// Poll the AppInventor bridge (fallback for apps that don't push via RunJavaScript)
+function startAppPoll() {
+  stopAppPoll();
+  appTimer = setInterval(() => {
+    const msg = fromApp();
+    if (msg && msg !== lastAppMsg) appMsg(msg);
+  }, APP_INV_MS);
+}
+function stopAppPoll() { clearInterval(appTimer); appTimer = null; }
+
+/* ─── Device list — names only ────────────────────────────────────────────── */
+function setScanLabel(txt, cls) {
+  const el = document.getElementById('lblScan');
+  if (el) { el.textContent = txt; el.className = cls || ''; }
+}
+
+// Drives the big connection status card (replaces MIT lblConnection)
+function setConnStatus(text, sub, state) {
+  const dot  = document.getElementById('csDot');
+  const main = document.getElementById('csText');
+  const sub_ = document.getElementById('csSub');
+  if (!dot) return;
+  dot.className = 'cs-dot' + (state ? ' ' + state : '');
+  if (main) main.textContent = text;
+  if (sub_) sub_.textContent = sub || '';
+}
+
+function addDevice(name) {
+  name = (name || '').trim();
+  if (!name) return;
+  if (!name.toLowerCase().includes('oref')) return;  // show only Oref Watch
+  if (devices.includes(name)) return;
+  devices.push(name);
+  populateDropdown();
+  document.getElementById('rowConnect').style.display = 'flex';
+  resetScanBtn();
+  setScanLabel('נמצא: ' + name + ' — בחר להתחברות', 'found');
+  setConnStatus('נמצא', name + ' — בחר והתחבר', 'on');
+  setStatus('נמצא Oref Watch', 'on');
+}
+
+function populateDropdown() {
+  const sel = document.getElementById('deviceSelect');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="__none__">-- בחר מכשיר --</option>';
+  devices.forEach(name => {
+    sel.appendChild(new Option(
+      name + (name === 'Oref-Watch-Prototype' ? '  ★' : ''), name));
+  });
+  if (cur && cur !== '__none__' && sel.querySelector(`option[value="${CSS.escape(cur)}"]`))
+    sel.value = cur;
+}
+
+/* ─── Scan ────────────────────────────────────────────────────────────────── */
+function handleScan() {
+  // Rescan always allowed — even while connected
+  devices = [];
+  populateDropdown();
+  document.getElementById('rowConnect').style.display = 'none';
+  document.getElementById('btnScan').textContent = 'סורק…';
+  document.getElementById('btnScan').disabled = true;
+  setScanLabel('סורק…', 'scanning');
+  setConnStatus('סורק…', 'מחפש Oref Watch בקרבת מקום', 'scan');
+  setStatus('מחפש מכשירים…', 'scan');
+  toApp('SCAN');
+  if (!window.AppInventor) {
+    setTimeout(() => {
+      addDevice('Oref-Watch-Prototype');
+      resetScanBtn();
+    }, 1800);
+  }
+}
+
+function resetScanBtn() {
+  const btn = document.getElementById('btnScan');
+  btn.disabled = false;
+  btn.textContent = bleConn ? '↺ סרוק שוב' : 'סרוק';
+}
+
+/* ─── Connect on dropdown choose ───────────────────────────────────────────── */
+function handleConnect() {
+  const sel = document.getElementById('deviceSelect');
+  const idx = sel.selectedIndex;           // 0 = placeholder, 1+ = real devices
+  if (idx < 1) return;                     // ignore placeholder selection
+
+  const chosen = sel.options[idx].text.replace('  ★','').trim();
+
+  // Already connected to the same device
+  if (bleConn && devName === chosen) {
+    toast('✅ כבר מחובר אל ' + chosen);
+    return;
+  }
+
+  // Connect (or reconnect to different device)
+  devName = chosen;
+  setScanLabel('מתחבר אל ' + chosen + '…', 'scanning');
+  setConnStatus('מתחבר…', chosen, 'scan');
+  setStatus('מתחבר…', 'scan');
+  toApp('CONNECT:' + idx);               // MIT: Connect(index)
+  if (!window.AppInventor) { setTimeout(() => onConnected(), 900); }
+}
+
+function onConnected() {
+  bleConn = true;
+  setStatus('מחובר: ' + devName, 'on');
+  setScanLabel('מחובר ✓  ' + devName, 'connected');
+  setConnStatus('מחובר ✓', devName, 'on');
+  document.getElementById('rowConnect').style.display = 'none';
+  resetScanBtn();
+  setButtonsEnabled(true);
+  refreshInfo();
+  toast('✅ מחובר אל ' + devName);
+}
+
+function onDisconnected() {
+  bleConn = false;
+  devices = [];
+  setStatus('החיבור אבד', 'err');
+  setScanLabel('החיבור אבד — לחץ סרוק מחדש', 'error');
+  setConnStatus('מנותק', 'לחץ סרוק מחדש', 'err');
+  document.getElementById('rowConnect').style.display = 'none';
+  resetScanBtn();
+  setButtonsEnabled(false);
+  refreshInfo();
+  toast('⚠️ החיבור אבד');
+}
+
+/* ─── Send BLE command ────────────────────────────────────────────────────── */
+function sendBLE(val) {
+  // Always send through App Inventor (even if not connected – app decides)
+  toApp(String(val));
+
+  const label = CMD[val] ?? String(val);
+  showLast(val + ' · ' + label);
+  setLit(val);
+  toast('📡 נשלח: ' + label);
+}
+
+// Silent version used by real-mode (no toast to avoid spam)
+function sendBLESilent(val) {
+  toApp(String(val));
+  showLast(val + ' · ' + (CMD[val] ?? val));
+  setLit(val);
+}
+
+/* ─── Mode toggle ─────────────────────────────────────────────────────────── */
+function setMode(m) {
+  curMode = m;
+  document.getElementById('scrDemo').classList.toggle('active', m === 'demo');
+  document.getElementById('scrReal').classList.toggle('active', m === 'real');
+  document.getElementById('btnDemo').classList.toggle('active', m === 'demo');
+  document.getElementById('btnReal').classList.toggle('active', m === 'real');
+  document.getElementById('iReal').textContent = m === 'real' ? '🔴 פעיל' : 'כבוי';
+
+  if (m === 'real') startPolling(); else stopPolling();
+}
+
+/* ─── UI helpers ──────────────────────────────────────────────────────────── */
+function setStatus(txt, state) {
+  // sbar removed — status shown in connStatus card only
+  const sub = document.getElementById('csSub');
+  if (sub) sub.textContent = txt;
+}
+
+function setBtnConn(state) { /* no-op — state managed by setScanLabel */ }
+
+function setButtonsEnabled(en) {
+  [0,1,2,3].forEach(i => document.getElementById('btn'+i)?.classList.toggle('dim', !en));
+}
+
+function showLast(txt) { /* sbar removed — last sent shown in connStatus */ }
+
+function setLit(cmd) {
+  [0,1,2,3].forEach(i => document.getElementById('btn'+i)?.classList.remove('lit'));
+  document.getElementById('btn'+cmd)?.classList.add('lit');
+}
+
+function refreshInfo() {
+  document.getElementById('iStat').textContent = bleConn ? '🟢 מחובר' : '🔴 מנותק';
+  document.getElementById('iStat').className   = 'iv ' + (bleConn ? 'ok' : 'bad');
+  document.getElementById('iName').textContent = devName || '—';
+  document.getElementById('iAddr').textContent = devAddr || '—';
+  document.getElementById('iApp').textContent  = window.AppInventor ? '✅ מחובר' : '⚠ לא זמין (דפדפן)';
+  document.getElementById('iEp').textContent   = OREF_ENDPOINTS[orefEpIdx]?.label ?? '—';
+}
+
+/* ─── Status info sheet ───────────────────────────────────────────────────── */
+function openInfo()  { refreshInfo(); document.getElementById('overlay').classList.add('open'); }
+function closeInfo() { document.getElementById('overlay').classList.remove('open'); }
+function closeInfoOutside(e) { if (e.target===document.getElementById('overlay')) closeInfo(); }
+
+/* ─── Toast ───────────────────────────────────────────────────────────────── */
+let _tt;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+/* ─── REAL MODE – Pikud HaOref API ───────────────────────────────────────── */
+// Endpoint returns empty / null when no alert, or a JSON object for an active alert.
+// We filter for cat === "1" (missiles / rockets) only.
+
+function startPolling() {
+  stopPolling();
+  appOrefReceived = false;
+  document.getElementById('corsWarn').style.display = 'none';
+  document.getElementById('pDot').className = 'pdot live';
+  document.getElementById('pTxt').textContent = 'מאזין';
+  // Hosted on GitHub Pages (HTTPS) → proxies work → fetch directly
+  fetchAlerts();
+  pollTimer = setInterval(fetchAlerts, POLL_MS);
+}
+
+function stopPolling() {
+  clearInterval(pollTimer);
+  clearTimeout(pollTimer);
+  pollTimer = null;
+  appOrefReceived = false;
+  document.getElementById('pDot').className = 'pdot';
+  document.getElementById('pTxt').textContent = 'כבוי';
+  document.getElementById('corsWarn').style.display = 'none';
+}
+
+// ── Category map — all known Oref alert types ───────────────────────────────
+const CAT_NAMES = {
+  '1':  'ירי רקטות וטילים',
+  '2':  'חדירת כטב"מ',
+  '3':  'רעידת אדמה',
+  '4':  'גלי צונאמי',
+  '5':  'אירוע רדיולוגי',
+  '6':  'חדירת כלי טיס עוין',
+  '7':  'חומרים מסוכנים',
+  '8':  'אירוע כימי',
+  '9':  'הנחיית פיקוד העורף',
+  '10': 'כוחות ביטחון',
+  '11': 'פצצה חשודה',
+  '12': 'בדיקת מערכת',
+  '13': 'אזהרה אחרת',
+};
+
+// BLE command sent only for missiles (1) and hostile aircraft (6 = כלי טיס עוין)
+const BLE_ALERT_CATS = ['1', '6'];
+
+// ── processOrefRaw ─────────────────────────────────────────────────────────
+// Shows ALL alert types. BLE sent only for BLE_ALERT_CATS.
+function processOrefRaw(rawStr) {
+  const raw = (rawStr || '').trim();
+
+  if (!raw || raw === 'null' || raw === '[]' || raw === '{}') {
+    if (alertActive) { alertActive = false; lastAlertId = null; onAlertEnd(); }
+    return;
+  }
+
+  let data;
+  try { data = JSON.parse(raw); } catch { return; }
+
+  // Show ALL alert categories (filter removed for test mode)
+  if (data.id !== lastAlertId) {
+    lastAlertId = data.id;
+    alertActive = true;
+    onNewAlert(data);
+  }
+}
+
+// ── fetchAlerts ─────────────────────────────────────────────────────────────
+// Tries each endpoint in order; auto-advances on CORS / network failure.
+// WHY proxies fail from file:// or App Inventor WebView:
+//   Android's WebView treats file:// as a null origin.
+//   The browser-level CORS check fires BEFORE the network request completes,
+//   so even corsproxy.io / allorigins appear to "fail to fetch" — the request
+//   is cancelled by the browser before it leaves the device.
+// FIX for App Inventor: use App Inventor's Web component (native Android HTTP,
+//   not subject to CORS). The app sends back OREF_DATA:... via setWebViewString.
+//   This JS fetch path then becomes the fallback for plain-browser use only.
+async function fetchAlerts() {
+  if (appOrefReceived) return;
+
+  const ep = OREF_ENDPOINTS[orefEpIdx];
+  let raw;
+
+  try {
+    // No custom headers → no preflight → no hang
+    const res = await fetch(ep.url, { cache: 'no-store' });
+
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const body = await res.text();
+
+    if (ep.wrap) {
+      try { raw = JSON.parse(body).contents ?? ''; } catch { raw = ''; }
+    } else {
+      raw = body;
+    }
+
+    // Success
+    document.getElementById('corsWarn').style.display = 'none';
+    document.getElementById('pDot').className = 'pdot live';
+    document.getElementById('pTxt').textContent = 'מאזין · ' + ep.label;
+    orefEpIdx = 0;   // reset — keep using this working endpoint
+
+  } catch(e) {
+    console.warn('[Oref "' + ep.label + '"] ' + e.message);
+
+    const next = orefEpIdx + 1;
+    if (next < OREF_ENDPOINTS.length) {
+      orefEpIdx = next;
+      return fetchAlerts();
+    }
+
+    // All failed
+    document.getElementById('corsWarn').innerHTML =
+      '⛔ כל ה-proxies נכשלו.<br>'
+      + '<small>' + e.message + '</small>';
+    document.getElementById('corsWarn').style.display = 'block';
+    document.getElementById('pDot').className = 'pdot err';
+    document.getElementById('pTxt').textContent = 'שגיאה';
+    orefEpIdx = 0;
+    return;
+  }
+
+  processOrefRaw(raw);
+}
+
+function onNewAlert(data) {
+  const cat     = String(data.cat ?? '?');
+  const catName = CAT_NAMES[cat] || 'התרעה לא מוכרת';
+  const title   = data.title || catName;
+  const areas   = Array.isArray(data.data) ? data.data : [];
+  const desc    = data.desc || '';
+  const now     = new Date();
+  const timeStr = now.toLocaleTimeString('he-IL');
+
+  // ── Update named label ──
+  document.getElementById('lblAllertType').textContent = title;
+
+  // ── Show active card ──
+  const card = document.getElementById('alertCard');
+  card.classList.add('show');
+  card.style.animation = 'none';
+  card.offsetHeight;
+  card.style.animation = '';
+
+  // Badge — highlight BLE-trigger cats
+  const isBleAlert = BLE_ALERT_CATS.includes(cat);
+  document.getElementById('acBadgeTxt').textContent =
+    isBleAlert ? '🚨 התרעה פעילה' : '⚠️ התרעה';
+
+  // Category code + name
+  document.getElementById('acCatCode').textContent = 'קוד ' + cat;
+  document.getElementById('acCatName').textContent = catName;
+
+  document.getElementById('acTitle').textContent  = title;
+  document.getElementById('acAreas').textContent  =
+    areas.length ? '📍 ' + areas.join(' · ') : (desc || 'אזורים לא ידועים');
+  document.getElementById('acMeta').textContent   =
+    '🕐 ' + timeStr + '   ID: ' + (data.id ?? '—');
+  document.getElementById('noAlert').style.display = 'none';
+
+  // ── Send BLE command only for missiles (cat 1) and כלי טיס עוין (cat 6) ──
+  if (isBleAlert) {
+    sendBLESilent(2);
+    toast('🚨 BLE נשלח: ' + title);
+  } else {
+    toast('⚠️ ' + catName + ' [קוד ' + cat + '] — ללא BLE');
+  }
+
+  // ── History ──
+  addHistory('[' + cat + '] ' + title, areas.join(', '), timeStr);
+}
+
+function onAlertEnd() {
+  document.getElementById('lblAllertType').textContent = 'סיום אירוע';
+  document.getElementById('alertCard').classList.remove('show');
+  document.getElementById('noAlert').style.display = '';
+
+  // ── Send BLE command 3 = סיום אירוע ──
+  sendBLESilent(3);
+
+  toast('✅ האירוע הסתיים');
+}
+
+/* ─── History ─────────────────────────────────────────────────────────────── */
+function addHistory(type, areas, time) {
+  alertHistory.unshift({type, areas, time});
+  if (alertHistory.length > 50) alertHistory.length = 50;
+  renderHistory();
+}
+
+function renderHistory() {
+  const el = document.getElementById('histList');
+  if (!alertHistory.length) {
+    el.innerHTML = '<div class="hi-empty">אין היסטוריה עדיין</div>';
+    return;
+  }
+  el.innerHTML = alertHistory.map(h => `
+    <div class="hi">
+      <span class="hi-time">${h.time}</span>
+      <span class="hi-type">${h.type}</span>
+      <span class="hi-areas">${h.areas || '—'}</span>
+    </div>`).join('');
+}
+
+/* ─── Boot ────────────────────────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  refreshInfo();
+  startAppPoll();   // start polling AppInventor bridge
+  renderHistory();
+
+  // If running inside App Inventor, announce ready
+  toApp('READY');
+});
+</script>
+</body>
+</html>
