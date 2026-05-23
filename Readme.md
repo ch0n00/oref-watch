@@ -123,12 +123,12 @@ LED + Vibration
 ![Application](screenshots/app.jpeg)
 
 ## PCB / Wiring
-_(להוסיף צילום לוח והרכבה)_
+
+![Wiring](wiring/O-Watch-Wiring.svg)
 
 ---
 
 # 📥 הורדות
-
 ## APK
 [Download APK](https://github.com/ch0n00/oref-watch/raw/main/apk/OrefWatch.apk)
 
