@@ -133,7 +133,7 @@ _(להוסיף צילום לוח והרכבה)_
 [Download APK](https://github.com/ch0n00/oref-watch/raw/main/apk/OrefWatch.apk)
 
 ## קוד Arduino
-[Arduino Firmware](./firmware)
+[Arduino Firmware](./firmware/e_clock_ble_prod_ino_v2.ino)
 
 ## MIT App Inventor Project
 [MIT Project](./appinventor)
