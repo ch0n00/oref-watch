@@ -55,7 +55,7 @@
 
 ## אפשרות 2 — הורדת APK ישירה
 
-[Download APK]([apk/OrefWatch.apk](https://github.com/ch0n00/oref-watch/raw/main/apk/OrefWatch.apk))
+[Download APK](apk/OrefWatch.apk](https://github.com/ch0n00/oref-watch/raw/main/apk/OrefWatch.apk)
 
 ---
 
