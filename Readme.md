@@ -136,7 +136,7 @@ _(להוסיף צילום לוח והרכבה)_
 [Arduino Firmware](./firmware/e_clock_ble_prod_ino_v2.ino)
 
 ## MIT App Inventor Project
-[MIT Project](./appinventor)
+[MIT Project](./MIT/emergency_clock_v3.aia)
 
 ---
 
