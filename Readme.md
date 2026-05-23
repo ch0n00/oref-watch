@@ -119,7 +119,7 @@ _(להוסיף צילום לוח והרכבה)_
 # 📥 הורדות
 
 ## APK
-![Download APK](./apk/OrefWatch.apk)
+[Download APK](https://github.com/ch0n00/oref-watch/raw/main/apk/OrefWatch.apk)
 
 ## קוד Arduino
 [Arduino Firmware](./firmware)
