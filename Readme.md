@@ -49,7 +49,7 @@
 
 ## אפשרות 1 — סריקת QR Code
 
-![screenshots](QR.png)
+![QR-CODE](screenshots/QR.png)
 
 ---
 
